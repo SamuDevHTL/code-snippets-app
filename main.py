@@ -220,6 +220,17 @@ class SnippetManager(QMainWindow):
                 border-radius: 5px;
                 font-family: 'Courier New', monospace;
             }
+            QLineEdit {
+                background-color: #3B4252;
+                color: #ECEFF4;
+                border: 1px solid #4C566A;
+                border-radius: 5px;
+                padding: 5px;
+                font-size: 14px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #81A1C1;
+            }
         """)
 
     def load_snippets(self):
