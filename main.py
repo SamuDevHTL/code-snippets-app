@@ -28,11 +28,6 @@ class AddSnippetDialog(QDialog):
         # Main layout
         layout = QVBoxLayout()
 
-        # Snippet title input
-        self.title_edit = QLineEdit(self)
-        self.title_edit.setPlaceholderText("Enter snippet title here...")
-        layout.addWidget(self.title_edit)
-
         # Code snippet editor
         self.text_edit = QPlainTextEdit(self)
         self.text_edit.setPlaceholderText("Enter your code snippet here...")
@@ -55,11 +50,9 @@ class AddSnippetDialog(QDialog):
         layout.addLayout(button_layout)
         self.setLayout(layout)
 
-    def get_snippet(self):
-        """Return the title and text entered in the dialog."""
-        title = self.title_edit.text().strip()
-        snippet = self.text_edit.toPlainText().strip()
-        return title, snippet
+    def get_text(self):
+        """Return the text entered in the dialog."""
+        return self.text_edit.toPlainText()
 
 class SnippetManager(QMainWindow):
     def __init__(self):
@@ -95,6 +88,7 @@ class SnippetManager(QMainWindow):
         self.custom_title_bar.setFixedHeight(30)
 
         layout = QHBoxLayout()
+
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(2)
 
@@ -130,9 +124,25 @@ class SnippetManager(QMainWindow):
         label.setStyleSheet("color: #D8DEE9; font-size: 16px;")
         main_layout.addWidget(label)
 
-        self.search_bar = QLineEdit(self)
+        self.search_bar = QLineEdit()
         self.search_bar.setPlaceholderText("Search snippets...")
-        self.search_bar.textChanged.connect(self.filter_snippets)
+        self.search_bar.setStyleSheet("""
+            QLineEdit {
+                background-color: #3B4252;
+                color: #ECEFF4;
+                border: 1px solid #4C566A;
+                border-radius: 5px;
+                padding: 8px;
+                font-size: 14px;
+            }
+            QLineEdit:hover {
+                background-color: #4C566A;
+            }
+            QLineEdit:focus {
+                border-color: #81A1C1;
+                background-color: #3B4252;
+            }
+        """)
         main_layout.addWidget(self.search_bar)
 
         self.snippet_list = QListWidget()
@@ -227,14 +237,13 @@ class SnippetManager(QMainWindow):
         try:
             with open(self.snippet_file, "r") as file:
                 snippets = json.load(file)
-                self.snippet_list.addItems([f"{item['title']}: {item['snippet']}" for item in snippets])
+                self.snippet_list.addItems(snippets)
         except (FileNotFoundError, json.JSONDecodeError):
             self.snippet_list.addItems([])
 
     def save_snippets(self):
         """Save snippets to the JSON file."""
-        snippets = [{"title": self.snippet_list.item(i).text().split(":")[0].strip(), 
-                     "snippet": self.snippet_list.item(i).text().split(":")[1].strip()} for i in range(self.snippet_list.count())]
+        snippets = [self.snippet_list.item(i).text() for i in range(self.snippet_list.count())]
         with open(self.snippet_file, "w") as file:
             json.dump(snippets, file, indent=4)
 
@@ -242,9 +251,9 @@ class SnippetManager(QMainWindow):
         """Open dialog to add a new snippet."""
         dialog = AddSnippetDialog(self)
         if dialog.exec():
-            title, snippet = dialog.get_snippet()
-            if title and snippet:
-                self.snippet_list.addItem(f"{title}: {snippet}")
+            snippet = dialog.get_text()
+            if snippet.strip():
+                self.snippet_list.addItem(snippet)
                 self.save_snippets()
                 self.status_bar.showMessage("Snippet added successfully.", 2000)
 
@@ -253,13 +262,11 @@ class SnippetManager(QMainWindow):
         selected_item = self.snippet_list.currentItem()
         if selected_item:
             dialog = AddSnippetDialog(self)
-            title, snippet = selected_item.text().split(":", 1)
-            dialog.title_edit.setText(title.strip())
-            dialog.text_edit.setPlainText(snippet.strip())
+            dialog.text_edit.setPlainText(selected_item.text())
             if dialog.exec():
-                new_title, new_snippet = dialog.get_snippet()
-                if new_title and new_snippet:
-                    selected_item.setText(f"{new_title}: {new_snippet}")
+                snippet = dialog.get_text()
+                if snippet.strip():
+                    selected_item.setText(snippet)
                     self.save_snippets()
                     self.status_bar.showMessage("Snippet edited successfully.", 2000)
         else:
@@ -279,7 +286,7 @@ class SnippetManager(QMainWindow):
         """Copy the selected snippet to the clipboard."""
         selected_item = self.snippet_list.currentItem()
         if selected_item:
-            snippet = selected_item.text().split(":", 1)[1].strip()
+            snippet = selected_item.text()
             clipboard = QApplication.clipboard()
             clipboard.setText(snippet)
             self.status_bar.showMessage(f"Snippet copied to clipboard:\n{snippet}", 2000)
@@ -296,12 +303,6 @@ class SnippetManager(QMainWindow):
             self.showNormal()
         else:
             self.showFullScreen()
-
-    def filter_snippets(self, text):
-        """Filter snippets based on search text."""
-        for i in range(self.snippet_list.count()):
-            item = self.snippet_list.item(i)
-            item.setHidden(text.lower() not in item.text().lower())
 
     def mousePressEvent(self, event: QMouseEvent):
         """Handle mouse press event for dragging the window."""
