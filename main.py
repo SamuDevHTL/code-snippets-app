@@ -1,22 +1,21 @@
-import sys
 import json
+import sys
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
     QVBoxLayout,
     QPushButton,
     QListWidget,
-    QLabel,
     QMessageBox,
     QDialog,
     QPlainTextEdit,
     QHBoxLayout,
     QWidget,
     QStatusBar,
+    QLabel
 )
-from PyQt6.QtGui import QIcon, QFont, QKeySequence
-from PyQt6.QtCore import Qt
-
+from PyQt6.QtGui import QIcon, QFont, QMouseEvent, QKeySequence
+from PyQt6.QtCore import Qt, QPoint
 
 class AddSnippetDialog(QDialog):
     def __init__(self, parent=None):
@@ -54,35 +53,85 @@ class AddSnippetDialog(QDialog):
         """Return the text entered in the dialog."""
         return self.text_edit.toPlainText()
 
-
 class SnippetManager(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Code Snippet Manager")
-        self.setGeometry(300, 300, 600, 400)
+        # Remove the default title bar
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowSystemMenuHint |
+                            Qt.WindowType.WindowCloseButtonHint)
 
-        # Apply modern styles
+        # Apply macOS-like styles
         self.apply_styles()
+
+        # Custom top bar
+        self.custom_title_bar = QWidget(self)
+        self.custom_title_bar.setStyleSheet("""
+            QWidget {
+                background-color: #2E3440;
+                border-bottom: 1px solid #4C566A;
+            }
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                color: #D8DEE9;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                color: #81A1C1;
+            }
+            QPushButton:pressed {
+                background-color: #434C5E;
+            }
+        """)
+        self.custom_title_bar.setFixedHeight(30)
+
+        layout = QHBoxLayout()
+
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+
+        layout.addStretch()  # Fills space on the left
+
+        minimize_button = QPushButton()
+        minimize_button.setIcon(QIcon("assets/minimize_icon.png"))
+        minimize_button.clicked.connect(self.showMinimized)
+        layout.addWidget(minimize_button)
+
+        fullscreen_button = QPushButton()
+        fullscreen_button.setIcon(QIcon("assets/fullscreen_icon.png"))
+        fullscreen_button.clicked.connect(self.toggle_fullscreen)
+        layout.addWidget(fullscreen_button)
+
+        close_button = QPushButton()
+        close_button.setIcon(QIcon("assets/close_icon.png"))
+        close_button.clicked.connect(self.close_application)
+        layout.addWidget(close_button)
+
+        for i in range(layout.count()):
+            widget = layout.itemAt(i).widget()
+            if widget:
+                widget.setFixedSize(24, 24)  # Set a smaller fixed size for the icons
+
+        self.custom_title_bar.setLayout(layout)
 
         # Main layout
         main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 3, 0, 1)  # Adjust margins for top bar
 
-        # Label
         label = QLabel("Code Snippets:")
+        label.setStyleSheet("color: #D8DEE9; font-size: 16px;")
         main_layout.addWidget(label)
 
-        # List of snippets
         self.snippet_list = QListWidget()
         self.snippet_list.itemDoubleClicked.connect(self.edit_snippet)
         main_layout.addWidget(self.snippet_list)
 
-        # Load snippets from JSON
         self.snippet_file = "snippets.json"
         self.load_snippets()
 
-        # Buttons
         button_layout = QHBoxLayout()
+        button_layout.setContentsMargins(0, 0, 0, 0)
 
         self.add_button = QPushButton("Add Snippet")
         self.add_button.setIcon(QIcon("assets/add_icon.png"))
@@ -110,17 +159,20 @@ class SnippetManager(QMainWindow):
 
         main_layout.addLayout(button_layout)
 
-        # Set central widget
         container = QWidget()
         container.setLayout(main_layout)
-        self.setCentralWidget(container)
 
-        # Add a status bar
+        layout = QVBoxLayout()
+        layout.addWidget(self.custom_title_bar)
+        layout.addWidget(container)
+        self.setCentralWidget(QWidget(self))
+        self.centralWidget().setLayout(layout)
+
         self.status_bar = QStatusBar()
-        self.setStatusBar(self.status_bar )
+        self.setStatusBar(self.status_bar)
 
     def apply_styles(self):
-        """Apply modern styles to the application."""
+        """Apply macOS-like styles to the application."""
         self.setStyleSheet("""
             QMainWindow {
                 background-color: #2E3440;
@@ -129,7 +181,7 @@ class SnippetManager(QMainWindow):
             QLabel {
                 font-size: 16px;
                 font-weight: bold;
-                color: #FFFFFF
+                color: #D8DEE9;
             }
             QListWidget {
                 background-color: #3B4252;
@@ -219,6 +271,37 @@ class SnippetManager(QMainWindow):
         else:
             QMessageBox.warning(self, "No Selection", "Please select a snippet to copy.")
 
+    def close_application(self):
+        """Close the application."""
+        QApplication.quit()
+
+    def toggle_fullscreen(self):
+        """Toggle fullscreen mode."""
+        if self.isFullScreen():
+            self.showNormal()
+        else:
+            self.showFullScreen()
+
+    def mousePressEvent(self, event: QMouseEvent):
+        """Handle mouse press event for dragging the window."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.drag_position = event.globalPosition().toPoint()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        """Handle mouse move event for dragging the window."""
+        if event.buttons() == Qt.MouseButton.LeftButton and hasattr(self, 'drag_position'):
+            delta = QPoint(event.globalPosition().toPoint() - self.drag_position)
+            self.move(self.x() + delta.x(), self.y() + delta.y())
+            self.drag_position = event.globalPosition().toPoint()
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        """Handle mouse release event to stop dragging."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            if hasattr(self, 'drag_position'):
+                del self.drag_position
+        super().mouseReleaseEvent(event)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
