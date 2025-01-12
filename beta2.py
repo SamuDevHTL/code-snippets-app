@@ -137,35 +137,26 @@ class Sidebar(QWidget):
 
         layout = QVBoxLayout()
 
-        # Only keep the "Change Directory" button
-        change_dir_button = QPushButton("Change Directory")
-        change_dir_button.setIcon(QIcon("assets/change_dir_icon.png"))  # Add appropriate icon
-        layout.addWidget(change_dir_button)
-
-        # Connect the button to the change directory functionality
-        change_dir_button.clicked.connect(self.change_directory)
+        # Add "Load Snippets" button
+        load_snippets_button = QPushButton("Load Snippets")
+        load_snippets_button.setIcon(QIcon("assets/load_icon.png"))  # Add appropriate icon
+        load_snippets_button.clicked.connect(self.load_snippets)
+        layout.addWidget(load_snippets_button)
 
         self.setLayout(layout)
 
-    def change_directory(self):
-        """Open a dialog to select a directory and update the snippet directory."""
-        directory = QFileDialog.getExistingDirectory(self, "Select Directory")
-        if directory:
-            # Update the snippet path or handle directory change as needed
-            print(f"Directory changed to: {directory}")
-
-            # Implement logic to handle the directory change
-            # For example, update a variable or update UI elements
-
-    def change_directory(self):
-        """Open a dialog to select a directory and update the snippet directory."""
-        directory = QFileDialog.getExistingDirectory(self, "Select Directory")
-        if directory:
-            # Update the snippet path or handle directory change as needed
-            print(f"Directory changed to: {directory}")
-
-            # Implement logic to handle the directory change
-            # For example, update a variable or update UI elements
+    def load_snippets(self):
+        """Open a file dialog to select a JSON file and load snippets."""
+        if self.parent() and hasattr(self.parent(), 'load_snippets_from_file'):
+            # Open a file dialog to select a JSON file
+            file_path, _ = QFileDialog.getOpenFileName(
+                self,
+                "Open Snippets File",  # Dialog title
+                "",  # Start directory (empty means default)
+                "JSON Files (*.json);;All Files (*)"  # File filter
+            )
+            if file_path:  # If a file was selected
+                self.parent().load_snippets_from_file(file_path)  # Call parent's method to load the file
 
 
 class SnippetManager(QMainWindow):
@@ -233,6 +224,10 @@ class SnippetManager(QMainWindow):
         main_layout = QHBoxLayout()
         main_layout.setContentsMargins(0, 3, 0, 1)  # Adjust margins for top bar
 
+        # Add sidebar
+        self.sidebar = Sidebar(self)
+        main_layout.addWidget(self.sidebar)
+
         content_layout = QVBoxLayout()
 
         label = QLabel("Code Snippets:")
@@ -248,7 +243,10 @@ class SnippetManager(QMainWindow):
         self.snippet_list.itemDoubleClicked.connect(self.edit_snippet)
         content_layout.addWidget(self.snippet_list)
 
-        self.current_file = None  # Track the currently loaded JSON file
+        self.snippet_file = "snippets.json"  # Define the snippet file
+        self.current_directory = "."  # Default to current directory
+
+        self.load_snippets()  # Load snippets from the current directory
 
         button_layout = QHBoxLayout()
         button_layout.setContentsMargins(0, 0, 0, 0)
@@ -277,11 +275,6 @@ class SnippetManager(QMainWindow):
         self.copy_button.setShortcut(QKeySequence("Ctrl+C"))  # Keyboard shortcut
         button_layout.addWidget(self.copy_button)
 
-        self.load_button = QPushButton("Load Snippets")
-        self.load_button.setIcon(QIcon("assets/load_icon.png"))
-        self.load_button.clicked.connect(self.load_snippets)
-        button_layout.addWidget(self.load_button)
-
         content_layout.addLayout(button_layout)
 
         # Add the content layout to the main layout
@@ -298,36 +291,27 @@ class SnippetManager(QMainWindow):
 
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
+        
+        self.load_snippets()
 
     def load_snippets(self):
-        """Open a file dialog to select a JSON file and load snippets."""
-        file_name, _ = QFileDialog.getOpenFileName(self, "Open Snippet File", "", "JSON Files (*.json)")
-        if file_name:
-            self.current_file = file_name
-            try:
-                with open(self.current_file, "r") as file:
-                    snippets = json.load(file)
-                    self.snippet_list.clear()
-                    self.snippet_list.addItems([f"{item['title']}: {item['snippet']}" for item in snippets])
-            except (FileNotFoundError, json.JSONDecodeError):
-                self.snippet_list.clear()
-                QMessageBox.warning(self, "Error", "Failed to load snippets from the selected file.")
+        """Load snippets from the JSON file in the selected directory."""
+        try:
+            with open(f"{self.current_directory}/{self.snippet_file}", "r") as file:
+                snippets = json.load(file)
+                self.snippet_list.clear()  # Clear the list before loading new snippets
+                self.snippet_list.addItems([f"{item['title']}: {item['snippet']}" for item in snippets])
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.snippet_list.clear()  # Clear the list if the file is not found or invalid
+            self.snippet_list.addItems([])
+
 
     def save_snippets(self):
-        """Open a file dialog to save snippets to a JSON file."""
-        if not self.current_file:
-            file_name, _ = QFileDialog.getSaveFileName(self, "Save Snippet File", "", "JSON Files (*.json)")
-            if file_name:
-                self.current_file = file_name
-
-        if self.current_file:
-            snippets = [{"title": self.snippet_list.item(i).text().split(":")[0].strip(), 
-                        "snippet": self.snippet_list.item(i).text().split(":")[1].strip()} for i in range(self.snippet_list.count())]
-            with open(self.current_file, "w") as file:
-                json.dump(snippets, file, indent=4)
-            self.status_bar.showMessage("Snippets saved successfully.", 2000)
-
-    # Other methods (add_snippet, edit_snippet, delete_snippet, copy_snippet, etc.) remain unchanged
+        """Save snippets to the JSON file in the selected directory."""
+        snippets = [{"title": self.snippet_list.item(i).text().split(":")[0].strip(), 
+                    "snippet": self.snippet_list.item(i).text().split(":")[1].strip()} for i in range(self.snippet_list.count())]
+        with open(f"{self.current_directory}/{self.snippet_file}", "w") as file:
+            json.dump(snippets, file, indent=4)
 
 
     def add_snippet(self):
@@ -377,13 +361,6 @@ class SnippetManager(QMainWindow):
             self.status_bar.showMessage(f"Snippet copied to clipboard:\n{snippet}", 2000)
         else:
             QMessageBox.warning(self, "No Selection", "Please select a snippet to copy.")
-
-    def change_directory(self):
-        """Open a dialog to select a directory and update the snippet directory."""
-        directory = QFileDialog.getExistingDirectory(self, "Select Directory")
-        if directory:
-            self.set_directory(directory)
-
 
     def close_application(self):
         """Close the application."""
