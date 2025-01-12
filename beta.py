@@ -252,7 +252,8 @@ class SnippetManager(QMainWindow):
         self.snippet_list.itemDoubleClicked.connect(self.edit_snippet)
         content_layout.addWidget(self.snippet_list)
 
-        self.snippet_directory = "."  # Default to current directory
+        self.snippet_file = "snippets.json"  # Define the snippet file
+        self.current_directory = "."  # Default to current directory
 
         self.load_snippets()  # Load snippets from the current directory
 
@@ -314,6 +315,7 @@ class SnippetManager(QMainWindow):
         self.current_directory = directory
         self.load_snippets()
 
+
     def save_snippets(self):
         """Save snippets to the JSON file in the selected directory."""
         snippets = [{"title": self.snippet_list.item(i).text().split(":")[0].strip(), 
@@ -321,9 +323,7 @@ class SnippetManager(QMainWindow):
         with open(f"{self.current_directory}/{self.snippet_file}", "w") as file:
             json.dump(snippets, file, indent=4)
 
-    # Other methods...
-
-
+    # Other methods (add_snippet, edit_snippet, delete_snippet, copy_snippet, etc.) remain unchanged
 
 
     def add_snippet(self):
