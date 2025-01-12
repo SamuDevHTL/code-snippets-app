@@ -13,10 +13,61 @@ from PyQt6.QtWidgets import (
     QWidget,
     QStatusBar,
     QLabel,
-    QLineEdit
+    QLineEdit,
+    QFileDialog
 )
 from PyQt6.QtGui import QIcon, QFont, QMouseEvent, QKeySequence
 from PyQt6.QtCore import Qt, QPoint
+
+def apply_styles(app):
+    """Apply macOS-like styles to the application."""
+    app.setStyleSheet("""
+        QMainWindow {
+            background-color: #2E3440;
+            color: #D8DEE9;
+        }
+        QLabel {
+            font-size: 16px;
+            font-weight: bold;
+            color: #D8DEE9;
+        }
+        QListWidget {
+            background-color: #3B4252;
+            color: #ECEFF4;
+            border: 1px solid #4C566A;
+            border-radius: 5px;
+            padding: 10px;
+        }
+        QPushButton {
+            background-color: #5E81AC;
+            color: #ECEFF4;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        QPushButton:hover {
+            background-color: #81A1C1;
+        }
+        QPlainTextEdit {
+            background-color: #3B4252;
+            color: #ECEFF4;
+            border: 1px solid #4C566A;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+        }
+        QLineEdit {
+            background-color: #3B4252;
+            color: #ECEFF4;
+            border: 1px solid #4C566A;
+            border-radius: 5px;
+            padding: 5px;
+            font-size: 14px;
+        }
+        QLineEdit:focus {
+            border: 1px solid #81A1C1;
+        }
+    """)
 
 class AddSnippetDialog(QDialog):
     def __init__(self, parent=None):
@@ -60,11 +111,11 @@ class AddSnippetDialog(QDialog):
         title = self.title_edit.text().strip()
         snippet = self.text_edit.toPlainText().strip()
         return title, snippet
-    
+
 class Sidebar(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        
+
         self.setStyleSheet("""
             QWidget {
                 background-color: #2E3440;
@@ -83,25 +134,39 @@ class Sidebar(QWidget):
                 background-color: #81A1C1;
             }
         """)
-        
+
         layout = QVBoxLayout()
 
-        add_button = QPushButton("Add Snippet")
-        add_button.setIcon(QIcon("assets/add_icon.png"))
-        add_button.setShortcut(QKeySequence("Ctrl+A"))  # Keyboard shortcut
-        layout.addWidget(add_button)
+        # Only keep the "Change Directory" button
+        change_dir_button = QPushButton("Change Directory")
+        change_dir_button.setIcon(QIcon("assets/change_dir_icon.png"))  # Add appropriate icon
+        layout.addWidget(change_dir_button)
 
-        edit_button = QPushButton("Edit Snippet")
-        edit_button.setIcon(QIcon("assets/edit_icon.png"))
-        edit_button.setShortcut(QKeySequence("Ctrl+E"))  # Keyboard shortcut
-        layout.addWidget(edit_button)
-
-        delete_button = QPushButton("Delete Snippet")
-        delete_button.setIcon(QIcon("assets/delete_icon.png"))
-        delete_button.setShortcut(QKeySequence("Ctrl+D"))  # Keyboard shortcut
-        layout.addWidget(delete_button)
+        # Connect the button to the change directory functionality
+        change_dir_button.clicked.connect(self.change_directory)
 
         self.setLayout(layout)
+
+    def change_directory(self):
+        """Open a dialog to select a directory and update the snippet directory."""
+        directory = QFileDialog.getExistingDirectory(self, "Select Directory")
+        if directory:
+            # Update the snippet path or handle directory change as needed
+            print(f"Directory changed to: {directory}")
+
+            # Implement logic to handle the directory change
+            # For example, update a variable or update UI elements
+
+    def change_directory(self):
+        """Open a dialog to select a directory and update the snippet directory."""
+        directory = QFileDialog.getExistingDirectory(self, "Select Directory")
+        if directory:
+            # Update the snippet path or handle directory change as needed
+            print(f"Directory changed to: {directory}")
+
+            # Implement logic to handle the directory change
+            # For example, update a variable or update UI elements
+
 
 class SnippetManager(QMainWindow):
     def __init__(self):
@@ -112,7 +177,7 @@ class SnippetManager(QMainWindow):
                             Qt.WindowType.WindowCloseButtonHint)
 
         # Apply macOS-like styles
-        self.apply_styles()
+        apply_styles(self)
 
         # Custom top bar
         self.custom_title_bar = QWidget(self)
@@ -187,8 +252,9 @@ class SnippetManager(QMainWindow):
         self.snippet_list.itemDoubleClicked.connect(self.edit_snippet)
         content_layout.addWidget(self.snippet_list)
 
-        self.snippet_file = "snippets.json"
-        self.load_snippets()
+        self.snippet_directory = "."  # Default to current directory
+
+        self.load_snippets()  # Load snippets from the current directory
 
         button_layout = QHBoxLayout()
         button_layout.setContentsMargins(0, 0, 0, 0)
@@ -234,74 +300,31 @@ class SnippetManager(QMainWindow):
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
 
-    # Other methods remain unchanged...
-
-
-    def apply_styles(self):
-        """Apply macOS-like styles to the application."""
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #2E3440;
-                color: #D8DEE9;
-            }
-            QLabel {
-                font-size: 16px;
-                font-weight: bold;
-                color: #D8DEE9;
-            }
-            QListWidget {
-                background-color: #3B4252;
-                color: #ECEFF4;
-                border: 1px solid #4C566A;
-                border-radius: 5px;
-                padding: 10px;
-            }
-            QPushButton {
-                background-color: #5E81AC;
-                color: #ECEFF4;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 5px;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: #81A1C1;
-            }
-            QPlainTextEdit {
-                background-color: #3B4252;
-                color: #ECEFF4;
-                border: 1px solid #4C566A;
-                border-radius: 5px;
-                font-family: 'Courier New', monospace;
-            }
-            QLineEdit {
-                background-color: #3B4252;
-                color: #ECEFF4;
-                border: 1px solid #4C566A;
-                border-radius: 5px;
-                padding: 5px;
-                font-size: 14px;
-            }
-            QLineEdit:focus {
-                border: 1px solid #81A1C1;
-            }
-        """)
-
     def load_snippets(self):
-        """Load snippets from the JSON file."""
+        """Load snippets from the JSON file in the selected directory."""
         try:
-            with open(self.snippet_file, "r") as file:
+            with open(f"{self.current_directory}/{self.snippet_file}", "r") as file:
                 snippets = json.load(file)
                 self.snippet_list.addItems([f"{item['title']}: {item['snippet']}" for item in snippets])
         except (FileNotFoundError, json.JSONDecodeError):
             self.snippet_list.addItems([])
 
+    def set_directory(self, directory):
+        """Set the current directory for snippets."""
+        self.current_directory = directory
+        self.load_snippets()
+
     def save_snippets(self):
-        """Save snippets to the JSON file."""
+        """Save snippets to the JSON file in the selected directory."""
         snippets = [{"title": self.snippet_list.item(i).text().split(":")[0].strip(), 
-                     "snippet": self.snippet_list.item(i).text().split(":")[1].strip()} for i in range(self.snippet_list.count())]
-        with open(self.snippet_file, "w") as file:
+                    "snippet": self.snippet_list.item(i).text().split(":")[1].strip()} for i in range(self.snippet_list.count())]
+        with open(f"{self.current_directory}/{self.snippet_file}", "w") as file:
             json.dump(snippets, file, indent=4)
+
+    # Other methods...
+
+
+
 
     def add_snippet(self):
         """Open dialog to add a new snippet."""
@@ -351,6 +374,13 @@ class SnippetManager(QMainWindow):
         else:
             QMessageBox.warning(self, "No Selection", "Please select a snippet to copy.")
 
+    def change_directory(self):
+        """Open a dialog to select a directory and update the snippet directory."""
+        directory = QFileDialog.getExistingDirectory(self, "Select Directory")
+        if directory:
+            self.set_directory(directory)
+
+
     def close_application(self):
         """Close the application."""
         QApplication.quit()
@@ -388,6 +418,8 @@ class SnippetManager(QMainWindow):
             if hasattr(self, 'drag_position'):
                 del self.drag_position
         super().mouseReleaseEvent(event)
+
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

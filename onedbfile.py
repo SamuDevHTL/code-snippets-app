@@ -60,48 +60,6 @@ class AddSnippetDialog(QDialog):
         title = self.title_edit.text().strip()
         snippet = self.text_edit.toPlainText().strip()
         return title, snippet
-    
-class Sidebar(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #2E3440;
-                color: #D8DEE9;
-            }
-            QPushButton {
-                background-color: #5E81AC;
-                color: #ECEFF4;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 5px;
-                font-size: 14px;
-                margin-bottom: 5px;
-            }
-            QPushButton:hover {
-                background-color: #81A1C1;
-            }
-        """)
-        
-        layout = QVBoxLayout()
-
-        add_button = QPushButton("Add Snippet")
-        add_button.setIcon(QIcon("assets/add_icon.png"))
-        add_button.setShortcut(QKeySequence("Ctrl+A"))  # Keyboard shortcut
-        layout.addWidget(add_button)
-
-        edit_button = QPushButton("Edit Snippet")
-        edit_button.setIcon(QIcon("assets/edit_icon.png"))
-        edit_button.setShortcut(QKeySequence("Ctrl+E"))  # Keyboard shortcut
-        layout.addWidget(edit_button)
-
-        delete_button = QPushButton("Delete Snippet")
-        delete_button.setIcon(QIcon("assets/delete_icon.png"))
-        delete_button.setShortcut(QKeySequence("Ctrl+D"))  # Keyboard shortcut
-        layout.addWidget(delete_button)
-
-        self.setLayout(layout)
 
 class SnippetManager(QMainWindow):
     def __init__(self):
@@ -165,27 +123,21 @@ class SnippetManager(QMainWindow):
         self.custom_title_bar.setLayout(layout)
 
         # Main layout
-        main_layout = QHBoxLayout()
+        main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 3, 0, 1)  # Adjust margins for top bar
-
-        # Add sidebar
-        self.sidebar = Sidebar(self)
-        main_layout.addWidget(self.sidebar)
-
-        content_layout = QVBoxLayout()
 
         label = QLabel("Code Snippets:")
         label.setStyleSheet("color: #D8DEE9; font-size: 16px;")
-        content_layout.addWidget(label)
+        main_layout.addWidget(label)
 
         self.search_bar = QLineEdit(self)
         self.search_bar.setPlaceholderText("Search snippets...")
         self.search_bar.textChanged.connect(self.filter_snippets)
-        content_layout.addWidget(self.search_bar)
+        main_layout.addWidget(self.search_bar)
 
         self.snippet_list = QListWidget()
         self.snippet_list.itemDoubleClicked.connect(self.edit_snippet)
-        content_layout.addWidget(self.snippet_list)
+        main_layout.addWidget(self.snippet_list)
 
         self.snippet_file = "snippets.json"
         self.load_snippets()
@@ -217,10 +169,7 @@ class SnippetManager(QMainWindow):
         self.copy_button.setShortcut(QKeySequence("Ctrl+C"))  # Keyboard shortcut
         button_layout.addWidget(self.copy_button)
 
-        content_layout.addLayout(button_layout)
-
-        # Add the content layout to the main layout
-        main_layout.addLayout(content_layout)
+        main_layout.addLayout(button_layout)
 
         container = QWidget()
         container.setLayout(main_layout)
@@ -233,9 +182,6 @@ class SnippetManager(QMainWindow):
 
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
-
-    # Other methods remain unchanged...
-
 
     def apply_styles(self):
         """Apply macOS-like styles to the application."""
