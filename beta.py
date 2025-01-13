@@ -1,5 +1,7 @@
 import json
 import sys
+import os
+import shutil
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -14,7 +16,10 @@ from PyQt6.QtWidgets import (
     QStatusBar,
     QLabel,
     QLineEdit,
-    QFileDialog
+    QFileDialog,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QInputDialog
 )
 from PyQt6.QtGui import QIcon, QFont, QMouseEvent, QKeySequence
 from PyQt6.QtCore import Qt, QPoint
@@ -67,6 +72,11 @@ def apply_styles(app):
         QLineEdit:focus {
             border: 1px solid #81A1C1;
         }
+        QTreeWidget {
+            background-color: #3B4252;
+            color: #ECEFF4;
+            border: 1px solid #4C566A;
+        }
     """)
 
 class AddSnippetDialog(QDialog):
@@ -75,6 +85,8 @@ class AddSnippetDialog(QDialog):
 
         self.setWindowTitle("Add/Edit Snippet")
         self.setGeometry(400, 400, 500, 300)
+
+
 
         # Main layout
         layout = QVBoxLayout()
@@ -116,57 +128,206 @@ class Sidebar(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
+        self.snippet_manager = None  # Placeholder for the snippet manager
+        self.project_folder = os.path.join(os.getcwd(), "snippets")  # Project folder for snippets
+
         self.setStyleSheet("""
             QWidget {
                 background-color: #2E3440;
                 color: #D8DEE9;
             }
-            QPushButton {
-                background-color: #5E81AC;
+            QTreeWidget {
+                background-color: #3B4252;
                 color: #ECEFF4;
-                border: none;
-                padding: 8px 16px;
+                border: 1px solid #4C566A;
                 border-radius: 5px;
-                font-size: 14px;
-                margin-bottom: 5px;
+                padding: 10px;
+            }
+            QTreeWidget::item:hover {
+                background-color: #434C5E;
+            }
+            QTreeWidget::item:selected {
+                background-color: #81A1C1;
+                color: #ECEFF4;
+            }
+            QPushButton {
+                background-color: #4C566A;
+                color: #ECEFF4;
+                border: 1px solid #5E81AC;
+                border-radius: 5px;
+                padding: 5px;
             }
             QPushButton:hover {
-                background-color: #81A1C1;
+                background-color: #5E81AC;
             }
         """)
 
         layout = QVBoxLayout()
 
-        # Only keep the "Change Directory" button
-        change_dir_button = QPushButton("Change Directory")
-        change_dir_button.setIcon(QIcon("assets/change_dir_icon.png"))  # Add appropriate icon
-        layout.addWidget(change_dir_button)
+        # Add a tree widget to display folders and files
+        self.tree_widget = QTreeWidget(self)
+        self.tree_widget.setHeaderHidden(True)  # Hide the header
+        self.tree_widget.itemClicked.connect(self.on_item_clicked)  # Connect item click event
+        layout.addWidget(self.tree_widget)
 
-        # Connect the button to the change directory functionality
-        change_dir_button.clicked.connect(self.change_directory)
+        # Populate the tree widget with folders and files
+        self.populate_tree()
+
+        # Add buttons for sidebar functionality
+        self.add_buttons(layout)
 
         self.setLayout(layout)
 
-    def change_directory(self):
-        """Open a dialog to select a directory and update the snippet directory."""
-        directory = QFileDialog.getExistingDirectory(self, "Select Directory")
-        if directory:
-            # Update the snippet path or handle directory change as needed
-            print(f"Directory changed to: {directory}")
+    def add_buttons(self, layout):
+        """Add buttons to the sidebar."""
+        load_button = QPushButton("Add Folder")
+        load_button.clicked.connect(self.add_folder)
 
-            # Implement logic to handle the directory change
-            # For example, update a variable or update UI elements
+        save_button = QPushButton("Add Snippet")
+        save_button.clicked.connect(self.add_file)
 
-    def change_directory(self):
-        """Open a dialog to select a directory and update the snippet directory."""
-        directory = QFileDialog.getExistingDirectory(self, "Select Directory")
-        if directory:
-            # Update the snippet path or handle directory change as needed
-            print(f"Directory changed to: {directory}")
+        refresh_button = QPushButton("Delete")
+        refresh_button.clicked.connect(self.remove_selected)
 
-            # Implement logic to handle the directory change
-            # For example, update a variable or update UI elements
+        # Add buttons to the layout
+        layout.addWidget(load_button)
+        layout.addWidget(save_button)
+        layout.addWidget(refresh_button)
 
+    def set_snippet_manager(self, snippet_manager):
+        """Set the snippet manager for the sidebar."""
+        self.snippet_manager = snippet_manager
+
+    def populate_tree(self):
+        """Populate the tree widget with folders and JSON files."""
+        if not os.path.exists(self.project_folder):
+            os.makedirs(self.project_folder)
+
+        root_folder = QTreeWidgetItem(self.tree_widget, ["Snippets"])
+        self.tree_widget.addTopLevelItem(root_folder)
+
+        for folder in os.listdir(self.project_folder):
+            folder_path = os.path.join(self.project_folder, folder)
+            if os.path.isdir(folder_path):
+                folder_item = QTreeWidgetItem(root_folder, [folder])
+                for file in os.listdir(folder_path):
+                    if file.endswith(".json"):
+                        file_item = QTreeWidgetItem(folder_item, [file])
+
+        # Expand the root folder by default
+        root_folder.setExpanded(True)
+
+    def refresh_sidebar(self):
+        """Placeholder for refreshing the sidebar."""
+        self.tree_widget.clear()
+        self.populate_tree()
+        QMessageBox.information(self, "Info", "Sidebar refreshed.")
+
+    def on_item_clicked(self, item):
+        """Handle item click event to load JSON files."""
+        if item.childCount() == 0:  # Check if the item is a file (no children)
+            file_name = item.text(0)
+            if item.parent() is not None:  # Check if the item has a parent
+                folder_name = item.parent().text(0)
+                file_path = os.path.join(self.project_folder, folder_name, file_name)
+            else:  # If the item is a top-level item, do not try to open a file
+                return
+
+            if os.path.isfile(file_path):  # Check if the file_path is a file
+                if file_path.endswith('.json'):  # Check if the file is a JSON file
+                    try:
+                        with open(file_path, "r") as file:
+                            data = json.load(file)
+                            if self.snippet_manager:
+                                self.snippet_manager.handle_loaded_json(data)
+                    except (FileNotFoundError, json.JSONDecodeError) as e:
+                        QMessageBox.warning(self, "Error", f"Could not load file: {file_name}")
+                else:
+                    QMessageBox.warning(self, "Error", f"'{file_name}' is not a JSON file.")
+            else:
+                if os.path.isdir(file_path):  # Check if the file_path is a directory
+                    QMessageBox.information(self, "Info", f"'{file_name}' is an empty folder.")
+                else:
+                    QMessageBox.warning(self, "Error", f"'{file_name}' is a directory, not a file.")
+        else:
+            QMessageBox.information(self, "Info", f"'{item.text(0)}' is a folder.")
+
+    def add_folder(self):
+        """Add a new folder to the tree."""
+        current_item = self.tree_widget.currentItem()
+        if not current_item:
+            QMessageBox.warning(self, "No Selection", "Please select a folder to add a sub-folder.")
+            return
+
+        folder_name, ok = QInputDialog.getText(self, "Add Folder", "Enter folder name:")
+        if ok and folder_name.strip():
+            new_folder = QTreeWidgetItem(current_item, [folder_name])
+            current_item.setExpanded(True)  # Expand the parent folder
+
+            # Create the new folder in the project folder
+            folder_path = os.path.join(self.project_folder, current_item.text(0), folder_name)
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
+
+    def add_file(self):
+        """Add a new JSON file to the tree."""
+        current_item = self.tree_widget.currentItem()
+        if not current_item or current_item.childCount() > 0:
+            QMessageBox.warning(self, "Invalid Selection", "Please select a folder to add a file.")
+            return
+
+        file_name, ok = QInputDialog.getText(self, "Add File", "Enter file name (with .json extension):")
+        if ok and file_name.strip().endswith(".json"):
+            QTreeWidgetItem(current_item, [file_name])
+            current_item.setExpanded(True)  # Expand the parent folder
+
+            # Create the new JSON file in the project folder
+            folder_path = os.path.join(self.project_folder, current_item.text(0))
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
+
+            file_path = os.path.join(folder_path, file_name)
+            with open(file_path, 'w') as file:
+                json.dump([], file)  # Initialize with an empty list
+
+        else:
+            QMessageBox.warning(self, "Invalid File Name", "File name must end with '.json'.")
+
+    def remove_selected(self):
+        """Remove the selected folder or file."""
+        current_item = self.tree_widget.currentItem()
+        if not current_item:
+            QMessageBox.warning(self, "No Selection", "Please select an item to remove.")
+            return
+
+        parent_item = current_item.parent()
+        if parent_item:
+            index = parent_item.indexOfChild(current_item)
+            parent_item.takeChild(index)
+
+            # Remove the corresponding file or folder from the project folder
+            if current_item.childCount() == 0:  # It's a file
+                file_path = os.path.join(self.project_folder, parent_item.text(0), current_item.text(0))
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            else:  # It's a folder
+                folder_path = os.path.join(self.project_folder, parent_item.text(0), current_item.text(0))
+                if os.path.exists(folder_path):
+                    try:
+                        shutil.rmtree(folder_path, ignore_errors=True)
+                    except OSError as e:
+                        QMessageBox.warning(self, "Error", f"Could not remove folder: {e}")
+        else:
+            index = self.tree_widget.indexOfTopLevelItem(current_item)
+            self.tree_widget.takeTopLevelItem(index)
+
+            # Remove the corresponding folder from the project folder
+            folder_path = os.path.join(self.project_folder, current_item.text(0))
+            if os.path.exists(folder_path):
+                try:
+                    shutil.rmtree(folder_path, ignore_errors=True)
+                except OSError as e:
+                    QMessageBox.warning(self, "Error", f"Could not remove folder: {e}")
 
 class SnippetManager(QMainWindow):
     def __init__(self):
@@ -229,6 +390,10 @@ class SnippetManager(QMainWindow):
 
         self.custom_title_bar.setLayout(layout)
 
+        # Sidebar setup
+        self.sidebar = Sidebar(self)
+        self.sidebar.set_snippet_manager(self)
+        
         # Main layout
         main_layout = QHBoxLayout()
         main_layout.setContentsMargins(0, 3, 0, 1)  # Adjust margins for top bar
@@ -284,7 +449,8 @@ class SnippetManager(QMainWindow):
 
         content_layout.addLayout(button_layout)
 
-        # Add the content layout to the main layout
+        # Add the sidebar and content layout to the main layout
+        main_layout.addWidget(self.sidebar)
         main_layout.addLayout(content_layout)
 
         container = QWidget()
@@ -328,7 +494,6 @@ class SnippetManager(QMainWindow):
             self.status_bar.showMessage("Snippets saved successfully.", 2000)
 
     # Other methods (add_snippet, edit_snippet, delete_snippet, copy_snippet, etc.) remain unchanged
-
 
     def add_snippet(self):
         """Open dialog to add a new snippet."""
@@ -378,13 +543,6 @@ class SnippetManager(QMainWindow):
         else:
             QMessageBox.warning(self, "No Selection", "Please select a snippet to copy.")
 
-    def change_directory(self):
-        """Open a dialog to select a directory and update the snippet directory."""
-        directory = QFileDialog.getExistingDirectory(self, "Select Directory")
-        if directory:
-            self.set_directory(directory)
-
-
     def close_application(self):
         """Close the application."""
         QApplication.quit()
@@ -423,7 +581,19 @@ class SnippetManager(QMainWindow):
                 del self.drag_position
         super().mouseReleaseEvent(event)
 
-
+    def handle_loaded_json(self, data):
+        """Handle the loaded JSON data."""
+        print("handle loaded json method called")
+        print(f"loaded json data: {data}")
+        # Clear the current snippet list
+        self.snippet_list.clear()
+        
+        # Add the loaded snippets to the list
+        for item in data:
+            self.snippet_list.addItem(f"{item['title']}: {item['snippet']}")
+        
+        # Optionally, set the current file path
+        self.current_file = "C:/Users/User/Desktop/code-snippets/code-snippets/snippets/snippets.json"  # Update this as needed
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
