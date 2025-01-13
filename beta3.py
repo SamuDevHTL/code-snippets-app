@@ -84,6 +84,8 @@ class AddSnippetDialog(QDialog):
         self.setWindowTitle("Add/Edit Snippet")
         self.setGeometry(400, 400, 500, 300)
 
+
+
         # Main layout
         layout = QVBoxLayout()
 
@@ -121,8 +123,11 @@ class AddSnippetDialog(QDialog):
         return title, snippet
 
 class Sidebar(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, snippet_manager=None):
         super().__init__(parent)
+
+    def set_snippet_manager(self, snippet_manager):
+        self.snippet_manager = snippet_manager
 
         self.setStyleSheet("""
             QWidget {
@@ -146,6 +151,9 @@ class Sidebar(QWidget):
         """)
 
         layout = QVBoxLayout()
+
+        
+
 
         # Tree widget to display folders and files
         self.tree_widget = QTreeWidget(self)
@@ -184,12 +192,10 @@ class Sidebar(QWidget):
             try:
                 with open(file_path, "r") as file:
                     data = json.load(file)
-                    snippet_manager = self.parent()  # Ensure correct reference
-                    if isinstance(snippet_manager, SnippetManager):
-                        print("parent controll")
-                        snippet_manager.handle_loaded_json(data)
+                    if self.snippet_manager:
+                        self.snippet_manager.handle_loaded_json(data)
             except (FileNotFoundError, json.JSONDecodeError) as e:
-                QMessageBox.warning(self, "Error", f"Failed to load JSON file: {e}")
+                QMessageBox.warning(self, "error")
 
 
 
@@ -257,6 +263,7 @@ class SnippetManager(QMainWindow):
 
         # Sidebar setup
         self.sidebar = Sidebar(self)
+        self.sidebar.set_snippet_manager(self)
         
         # Main layout
         main_layout = QHBoxLayout()
