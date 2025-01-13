@@ -1,5 +1,6 @@
 import json
 import sys
+import os
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -13,10 +14,68 @@ from PyQt6.QtWidgets import (
     QWidget,
     QStatusBar,
     QLabel,
-    QLineEdit
+    QLineEdit,
+    QFileDialog,
+    QTreeWidget,
+    QTreeWidgetItem
 )
 from PyQt6.QtGui import QIcon, QFont, QMouseEvent, QKeySequence
 from PyQt6.QtCore import Qt, QPoint
+
+def apply_styles(app):
+    """Apply macOS-like styles to the application."""
+    app.setStyleSheet("""
+        QMainWindow {
+            background-color: #2E3440;
+            color: #D8DEE9;
+        }
+        QLabel {
+            font-size: 16px;
+            font-weight: bold;
+            color: #D8DEE9;
+        }
+        QListWidget {
+            background-color: #3B4252;
+            color: #ECEFF4;
+            border: 1px solid #4C566A;
+            border-radius: 5px;
+            padding: 10px;
+        }
+        QPushButton {
+            background-color: #5E81AC;
+            color: #ECEFF4;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        QPushButton:hover {
+            background-color: #81A1C1;
+        }
+        QPlainTextEdit {
+            background-color: #3B4252;
+            color: #ECEFF4;
+            border: 1px solid #4C566A;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+        }
+        QLineEdit {
+            background-color: #3B4252;
+            color: #ECEFF4;
+            border: 1px solid #4C566A;
+            border-radius: 5px;
+            padding: 5px;
+            font-size: 14px;
+        }
+        QLineEdit:focus {
+            border: 1px solid #81A1C1;
+        }
+        QTreeWidget {
+            background-color: #3B4252;
+            color: #ECEFF4;
+            border: 1px solid #4C566A;
+        }
+    """)
 
 class AddSnippetDialog(QDialog):
     def __init__(self, parent=None):
@@ -24,6 +83,8 @@ class AddSnippetDialog(QDialog):
 
         self.setWindowTitle("Add/Edit Snippet")
         self.setGeometry(400, 400, 500, 300)
+
+
 
         # Main layout
         layout = QVBoxLayout()
@@ -60,48 +121,84 @@ class AddSnippetDialog(QDialog):
         title = self.title_edit.text().strip()
         snippet = self.text_edit.toPlainText().strip()
         return title, snippet
-    
+
 class Sidebar(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, snippet_manager=None):
         super().__init__(parent)
-        
+
+    def set_snippet_manager(self, snippet_manager):
+        self.snippet_manager = snippet_manager
+
         self.setStyleSheet("""
             QWidget {
                 background-color: #2E3440;
                 color: #D8DEE9;
             }
-            QPushButton {
-                background-color: #5E81AC;
+            QTreeWidget {
+                background-color: #3B4252;
                 color: #ECEFF4;
-                border: none;
-                padding: 8px 16px;
+                border: 1px solid #4C566A;
                 border-radius: 5px;
-                font-size: 14px;
-                margin-bottom: 5px;
+                padding: 10px;
             }
-            QPushButton:hover {
+            QTreeWidget::item:hover {
+                background-color: #434C5E;
+            }
+            QTreeWidget::item:selected {
                 background-color: #81A1C1;
+                color: #ECEFF4;
             }
         """)
-        
+
         layout = QVBoxLayout()
 
-        add_button = QPushButton("Add Snippet")
-        add_button.setIcon(QIcon("assets/add_icon.png"))
-        add_button.setShortcut(QKeySequence("Ctrl+A"))  # Keyboard shortcut
-        layout.addWidget(add_button)
+        
 
-        edit_button = QPushButton("Edit Snippet")
-        edit_button.setIcon(QIcon("assets/edit_icon.png"))
-        edit_button.setShortcut(QKeySequence("Ctrl+E"))  # Keyboard shortcut
-        layout.addWidget(edit_button)
 
-        delete_button = QPushButton("Delete Snippet")
-        delete_button.setIcon(QIcon("assets/delete_icon.png"))
-        delete_button.setShortcut(QKeySequence("Ctrl+D"))  # Keyboard shortcut
-        layout.addWidget(delete_button)
+        # Tree widget to display folders and files
+        self.tree_widget = QTreeWidget(self)
+        self.tree_widget.setHeaderHidden(True)  # Hide the header
+        self.tree_widget.itemClicked.connect(self.on_item_clicked)  # Connect item click event
+        layout.addWidget(self.tree_widget)
 
         self.setLayout(layout)
+
+        # Populate the tree widget with folders and files
+        self.populate_tree()
+
+    def populate_tree(self):
+        """Populate the tree widget with folders and JSON files."""
+        # Example folder structure
+        root_folder = QTreeWidgetItem(self.tree_widget, ["Snippets"])
+        folder1 = QTreeWidgetItem(root_folder, ["Folder 1"])
+        folder2 = QTreeWidgetItem(root_folder, ["Folder 2"])
+
+        # Add JSON files to folders
+        file1 = QTreeWidgetItem(folder1, ["snippets1.json"])
+        file2 = QTreeWidgetItem(folder1, ["snippets2.json"])
+        file3 = QTreeWidgetItem(folder2, ["snippets3.json"])
+
+        # Expand the root folder by default
+        root_folder.setExpanded(True)
+
+    def on_item_clicked(self, item):
+        """Handle item click event to load JSON files."""
+        print("folder clicked")
+        if item.childCount() == 0:  # Check if the item is a file (no children)
+            file_name = item.text(0)
+            project_folder = "C:/Users/User/Desktop/code-snippets/code-snippets/snippets/"
+            file_path = os.path.join(project_folder, file_name)
+
+            try:
+                with open(file_path, "r") as file:
+                    data = json.load(file)
+                    if self.snippet_manager:
+                        self.snippet_manager.handle_loaded_json(data)
+            except (FileNotFoundError, json.JSONDecodeError) as e:
+                QMessageBox.warning(self, "error")
+
+
+
 
 class SnippetManager(QMainWindow):
     def __init__(self):
@@ -112,7 +209,7 @@ class SnippetManager(QMainWindow):
                             Qt.WindowType.WindowCloseButtonHint)
 
         # Apply macOS-like styles
-        self.apply_styles()
+        apply_styles(self)
 
         # Custom top bar
         self.custom_title_bar = QWidget(self)
@@ -164,13 +261,13 @@ class SnippetManager(QMainWindow):
 
         self.custom_title_bar.setLayout(layout)
 
+        # Sidebar setup
+        self.sidebar = Sidebar(self)
+        self.sidebar.set_snippet_manager(self)
+        
         # Main layout
         main_layout = QHBoxLayout()
         main_layout.setContentsMargins(0, 3, 0, 1)  # Adjust margins for top bar
-
-        # Add sidebar
-        self.sidebar = Sidebar(self)
-        main_layout.addWidget(self.sidebar)
 
         content_layout = QVBoxLayout()
 
@@ -187,8 +284,7 @@ class SnippetManager(QMainWindow):
         self.snippet_list.itemDoubleClicked.connect(self.edit_snippet)
         content_layout.addWidget(self.snippet_list)
 
-        self.snippet_file = "snippets.json"
-        self.load_snippets()
+        self.current_file = None  # Track the currently loaded JSON file
 
         button_layout = QHBoxLayout()
         button_layout.setContentsMargins(0, 0, 0, 0)
@@ -217,9 +313,15 @@ class SnippetManager(QMainWindow):
         self.copy_button.setShortcut(QKeySequence("Ctrl+C"))  # Keyboard shortcut
         button_layout.addWidget(self.copy_button)
 
+        self.load_button = QPushButton("Load Snippets")
+        self.load_button.setIcon(QIcon("assets/load_icon.png"))
+        self.load_button.clicked.connect(self.load_snippets)
+        button_layout.addWidget(self.load_button)
+
         content_layout.addLayout(button_layout)
 
-        # Add the content layout to the main layout
+        # Add the sidebar and content layout to the main layout
+        main_layout.addWidget(self.sidebar)
         main_layout.addLayout(content_layout)
 
         container = QWidget()
@@ -234,74 +336,35 @@ class SnippetManager(QMainWindow):
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
 
-    # Other methods remain unchanged...
-
-
-    def apply_styles(self):
-        """Apply macOS-like styles to the application."""
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #2E3440;
-                color: #D8DEE9;
-            }
-            QLabel {
-                font-size: 16px;
-                font-weight: bold;
-                color: #D8DEE9;
-            }
-            QListWidget {
-                background-color: #3B4252;
-                color: #ECEFF4;
-                border: 1px solid #4C566A;
-                border-radius: 5px;
-                padding: 10px;
-            }
-            QPushButton {
-                background-color: #5E81AC;
-                color: #ECEFF4;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 5px;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: #81A1C1;
-            }
-            QPlainTextEdit {
-                background-color: #3B4252;
-                color: #ECEFF4;
-                border: 1px solid #4C566A;
-                border-radius: 5px;
-                font-family: 'Courier New', monospace;
-            }
-            QLineEdit {
-                background-color: #3B4252;
-                color: #ECEFF4;
-                border: 1px solid #4C566A;
-                border-radius: 5px;
-                padding: 5px;
-                font-size: 14px;
-            }
-            QLineEdit:focus {
-                border: 1px solid #81A1C1;
-            }
-        """)
-
     def load_snippets(self):
-        """Load snippets from the JSON file."""
-        try:
-            with open(self.snippet_file, "r") as file:
-                snippets = json.load(file)
-                self.snippet_list.addItems([f"{item['title']}: {item['snippet']}" for item in snippets])
-        except (FileNotFoundError, json.JSONDecodeError):
-            self.snippet_list.addItems([])
+        """Open a file dialog to select a JSON file and load snippets."""
+        file_name, _ = QFileDialog.getOpenFileName(self, "Open Snippet File", "", "JSON Files (*.json)")
+        if file_name:
+            self.current_file = file_name
+            try:
+                with open(self.current_file, "r") as file:
+                    snippets = json.load(file)
+                    self.snippet_list.clear()
+                    self.snippet_list.addItems([f"{item['title']}: {item['snippet']}" for item in snippets])
+            except (FileNotFoundError, json.JSONDecodeError):
+                self.snippet_list.clear()
+                QMessageBox.warning(self, "Error", "Failed to load snippets from the selected file.")
 
     def save_snippets(self):
-        """Save snippets to the JSON file."""
-        snippets = [{"title": self.snippet_list.item(i).text().split(":")[0].strip(), 
-                     "snippet": self.snippet_list.item(i).text().split(":")[1].strip()} for i in range(self.snippet_list.count())]
-        with open(self.snippet_file, "w") as file:
-            json.dump(snippets, file, indent=4)
+        """Open a file dialog to save snippets to a JSON file."""
+        if not self.current_file:
+            file_name, _ = QFileDialog.getSaveFileName(self, "Save Snippet File", "", "JSON Files (*.json)")
+            if file_name:
+                self.current_file = file_name
+
+        if self.current_file:
+            snippets = [{"title": self.snippet_list.item(i).text().split(":")[0].strip(), 
+                        "snippet": self.snippet_list.item(i).text().split(":")[1].strip()} for i in range(self.snippet_list.count())]
+            with open(self.current_file, "w") as file:
+                json.dump(snippets, file, indent=4)
+            self.status_bar.showMessage("Snippets saved successfully.", 2000)
+
+    # Other methods (add_snippet, edit_snippet, delete_snippet, copy_snippet, etc.) remain unchanged
 
     def add_snippet(self):
         """Open dialog to add a new snippet."""
@@ -388,6 +451,20 @@ class SnippetManager(QMainWindow):
             if hasattr(self, 'drag_position'):
                 del self.drag_position
         super().mouseReleaseEvent(event)
+
+    def handle_loaded_json(self, data):
+        """Handle the loaded JSON data."""
+        print("handle loaded json method called")
+        print(f"loaded json data: {data}")
+        # Clear the current snippet list
+        self.snippet_list.clear()
+        
+        # Add the loaded snippets to the list
+        for item in data:
+            self.snippet_list.addItem(f"{item['title']}: {item['snippet']}")
+        
+        # Optionally, set the current file path
+        self.current_file = "C:/Users/User/Desktop/code-snippets/code-snippets/snippets/snippets.json"  # Update this as needed
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -17,7 +17,8 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QFileDialog,
     QTreeWidget,
-    QTreeWidgetItem
+    QTreeWidgetItem,
+    QInputDialog
 )
 from PyQt6.QtGui import QIcon, QFont, QMouseEvent, QKeySequence
 from PyQt6.QtCore import Qt, QPoint
@@ -123,11 +124,10 @@ class AddSnippetDialog(QDialog):
         return title, snippet
 
 class Sidebar(QWidget):
-    def __init__(self, parent=None, snippet_manager=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
 
-    def set_snippet_manager(self, snippet_manager):
-        self.snippet_manager = snippet_manager
+        self.snippet_manager = None  # Placeholder for the snippet manager
 
         self.setStyleSheet("""
             QWidget {
@@ -148,42 +148,76 @@ class Sidebar(QWidget):
                 background-color: #81A1C1;
                 color: #ECEFF4;
             }
+            QPushButton {
+                background-color: #4C566A;
+                color: #ECEFF4;
+                border: 1px solid #5E81AC;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QPushButton:hover {
+                background-color: #5E81AC;
+            }
         """)
 
         layout = QVBoxLayout()
 
-        
-
-
-        # Tree widget to display folders and files
+        # Add a tree widget to display folders and files
         self.tree_widget = QTreeWidget(self)
         self.tree_widget.setHeaderHidden(True)  # Hide the header
         self.tree_widget.itemClicked.connect(self.on_item_clicked)  # Connect item click event
         layout.addWidget(self.tree_widget)
 
-        self.setLayout(layout)
-
         # Populate the tree widget with folders and files
         self.populate_tree()
 
+        # Add buttons for sidebar functionality
+        self.add_buttons(layout)
+
+        self.setLayout(layout)
+
+    def add_buttons(self, layout):
+        """Add buttons to the sidebar."""
+        load_button = QPushButton("add Folder")
+        load_button.clicked.connect(self.add_folder)
+
+        save_button = QPushButton("add Snippet")
+        save_button.clicked.connect(self.add_file)
+
+        refresh_button = QPushButton("delete")
+        refresh_button.clicked.connect(self.remove_selected)
+
+        # Add buttons to the layout
+        layout.addWidget(load_button)
+        layout.addWidget(save_button)
+        layout.addWidget(refresh_button)
+
+    def set_snippet_manager(self, snippet_manager):
+        """Set the snippet manager for the sidebar."""
+        self.snippet_manager = snippet_manager
+
     def populate_tree(self):
         """Populate the tree widget with folders and JSON files."""
-        # Example folder structure
         root_folder = QTreeWidgetItem(self.tree_widget, ["Snippets"])
         folder1 = QTreeWidgetItem(root_folder, ["Folder 1"])
         folder2 = QTreeWidgetItem(root_folder, ["Folder 2"])
 
         # Add JSON files to folders
-        file1 = QTreeWidgetItem(folder1, ["snippets1.json"])
-        file2 = QTreeWidgetItem(folder1, ["snippets2.json"])
-        file3 = QTreeWidgetItem(folder2, ["snippets3.json"])
+        QTreeWidgetItem(folder1, ["snippets1.json"])
+        QTreeWidgetItem(folder1, ["snippets2.json"])
+        QTreeWidgetItem(folder2, ["snippets3.json"])
 
         # Expand the root folder by default
         root_folder.setExpanded(True)
 
+    def refresh_sidebar(self):
+        """Placeholder for refreshing the sidebar."""
+        self.tree_widget.clear()
+        self.populate_tree()
+        QMessageBox.information(self, "Info", "Sidebar refreshed.")
+
     def on_item_clicked(self, item):
         """Handle item click event to load JSON files."""
-        print("folder clicked")
         if item.childCount() == 0:  # Check if the item is a file (no children)
             file_name = item.text(0)
             project_folder = "C:/Users/User/Desktop/code-snippets/code-snippets/snippets/"
@@ -195,9 +229,48 @@ class Sidebar(QWidget):
                     if self.snippet_manager:
                         self.snippet_manager.handle_loaded_json(data)
             except (FileNotFoundError, json.JSONDecodeError) as e:
-                QMessageBox.warning(self, "error")
+                QMessageBox.warning(self, "Error", f"Could not load file: {file_name}")
 
+    def add_folder(self):
+        """Add a new folder to the tree."""
+        current_item = self.tree_widget.currentItem()
+        if not current_item:
+            QMessageBox.warning(self, "No Selection", "Please select a folder to add a sub-folder.")
+            return
 
+        folder_name, ok = QInputDialog.getText(self, "Add Folder", "Enter folder name:")
+        if ok and folder_name.strip():
+            new_folder = QTreeWidgetItem(current_item, [folder_name])
+            current_item.setExpanded(True)  # Expand the parent folder
+
+    def add_file(self):
+        """Add a new JSON file to the tree."""
+        current_item = self.tree_widget.currentItem()
+        if not current_item or current_item.childCount() > 0:
+            QMessageBox.warning(self, "Invalid Selection", "Please select a folder to add a file.")
+            return
+
+        file_name, ok = QInputDialog.getText(self, "Add File", "Enter file name (with .json extension):")
+        if ok and file_name.strip().endswith(".json"):
+            QTreeWidgetItem(current_item, [file_name])
+            current_item.setExpanded(True)  # Expand the parent folder
+        else:
+            QMessageBox.warning(self, "Invalid File Name", "File name must end with '.json'.")
+
+    def remove_selected(self):
+        """Remove the selected folder or file."""
+        current_item = self.tree_widget.currentItem()
+        if not current_item:
+            QMessageBox.warning(self, "No Selection", "Please select an item to remove.")
+            return
+
+        parent_item = current_item.parent()
+        if parent_item:
+            index = parent_item.indexOfChild(current_item)
+            parent_item.takeChild(index)
+        else:
+            index = self.tree_widget.indexOfTopLevelItem(current_item)
+            self.tree_widget.takeTopLevelItem(index)
 
 
 class SnippetManager(QMainWindow):
