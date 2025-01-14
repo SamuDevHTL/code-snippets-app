@@ -129,8 +129,9 @@ class Sidebar(QWidget):
         super().__init__(parent)
 
         self.snippet_manager = None  # Placeholder for the snippet manager
-        self.project_folder = os.path.join(os.getcwd(), "snippets")  # Project folder for snippets
-
+        self.project_folder = os.path.join(os.getcwd(), "snippets") 
+        if not os.path.exists(self.project_folder):
+            os.makedirs(self.project_folder)
         self.setStyleSheet("""
             QWidget {
                 background-color: #2E3440;
@@ -293,7 +294,6 @@ class Sidebar(QWidget):
         else:
             QMessageBox.warning(self, "Invalid File Name", "File name must end with '.json'.")
 
-
     def remove_selected(self):
         """Remove the selected folder or file."""
         current_item = self.tree_widget.currentItem()
@@ -308,22 +308,30 @@ class Sidebar(QWidget):
 
             # Remove the corresponding file from the project folder
             file_path = os.path.join(self.project_folder, parent_item.text(0), current_item.text(0))
-            if os.path.exists(file_path):
-                try:
+            print(f"Removing file: {file_path}")
+            try:
+                if os.path.isfile(file_path):
+                    os.chmod(file_path, 0o777)  # Change file permissions to read, write, and execute
                     os.remove(file_path)
-                except OSError as e:
-                    QMessageBox.warning(self, "Error", f"Could not remove file: {e}")
+                    QMessageBox.information(self, "Success", f"File '{current_item.text(0)}' removed successfully.")
+                elif os.path.isdir(file_path):
+                    shutil.rmtree(file_path)
+                    QMessageBox.information(self, "Success", f"Folder '{current_item.text(0)}' removed successfully.")
+            except OSError as e:
+                QMessageBox.warning(self, "Error", f"Could not remove item: {e}")
         else:
             index = self.tree_widget.indexOfTopLevelItem(current_item)
             self.tree_widget.takeTopLevelItem(index)
 
             # Remove the corresponding folder from the project folder
             folder_path = os.path.join(self.project_folder, current_item.text(0))
-            if os.path.exists(folder_path):
-                try:
-                    shutil.rmtree(folder_path)
-                except OSError as e:
-                    QMessageBox.warning(self, "Error", f"Could not remove folder: {e}")
+            print(f"Removing folder: {folder_path}")
+            try:
+                shutil.rmtree(folder_path)
+                QMessageBox.information(self, "Success", f"Folder '{current_item.text(0)}' removed successfully.")
+            except OSError as e:
+                QMessageBox.warning(self, "Error", f"Could not remove folder: {e}")
+
 
 class SnippetManager(QMainWindow):
     def __init__(self):
