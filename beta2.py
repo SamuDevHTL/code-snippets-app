@@ -246,11 +246,11 @@ class Sidebar(QWidget):
                     QMessageBox.warning(self, "Error", f"'{file_name}' is not a JSON file.")
             else:
                 if os.path.isdir(file_path):  # Check if the file_path is a directory
-                    QMessageBox.information(self, "Info", f"'{file_name}' is an empty folder.")
+                    pass
                 else:
-                    QMessageBox.warning(self, "Error", f"'{file_name}' is a directory, not a file.")
+                    pass
         else:
-            QMessageBox.information(self, "Info", f"'{item.text(0)}' is a folder.")
+            pass
 
     def add_folder(self):
         """Add a new folder to the tree."""
@@ -321,7 +321,7 @@ class Sidebar(QWidget):
             folder_path = os.path.join(self.project_folder, current_item.text(0))
             if os.path.exists(folder_path):
                 try:
-                    shutil.rmtree(folder_path, ignore_errors=True)
+                    shutil.rmtree(folder_path)
                 except OSError as e:
                     QMessageBox.warning(self, "Error", f"Could not remove folder: {e}")
 
