@@ -273,26 +273,46 @@ class Sidebar(QWidget):
     def add_file(self):
         """Add a new JSON file to the tree."""
         current_item = self.tree_widget.currentItem()
-        if not current_item or current_item.childCount() > 0:
-            QMessageBox.warning(self, "Invalid Selection", "Please select a folder to add a file.")
-            return
 
-        file_name, ok = QInputDialog.getText(self, "Add File", "Enter file name (with .json extension):")
-        if ok and file_name.strip().endswith(".json"):
-            QTreeWidgetItem(current_item, [file_name])
-            current_item.setExpanded(True)  # Expand the parent folder
-
-            # Create the new JSON file in the project folder
-            folder_path = os.path.join(self.project_folder, current_item.text(0))
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
-
-            file_path = os.path.join(folder_path, file_name)
-            with open(file_path, 'w') as file:
-                json.dump([], file)  # Initialize with an empty list
-
+        # If no item is selected, add the file to the root folder
+        if current_item is None:
+            file_name, ok = QInputDialog.getText(self, "Add File", "Enter file name (with .json extension):")
+            if ok and file_name.strip().endswith(".json"):
+                # Add the file to the root folder in the tree
+                QTreeWidgetItem(self.tree_widget, [file_name])
+                # Create the file in the project folder
+                file_path = os.path.join(self.project_folder, file_name)
+                with open(file_path, 'w') as file:
+                    # Initialize the JSON file with an empty list
+                    json.dump([], file)
+                # Open the file for editing
+                self.snippet_manager.handle_loaded_json([])
+                self.snippet_manager.current_file = file_path
+            else:
+                QMessageBox.warning(self, "Invalid File Name", "File name must end with '.json'.")
         else:
-            QMessageBox.warning(self, "Invalid File Name", "File name must end with '.json'.")
+            # If a folder is selected, add the file to that folder
+            if current_item.childCount() > 0 or current_item.text(0) == "Snippets":
+                file_name, ok = QInputDialog.getText(self, "Add File", "Enter file name (with .json extension):")
+                if ok and file_name.strip().endswith(".json"):
+                    # Add the file to the selected folder in the tree
+                    QTreeWidgetItem(current_item, [file_name])
+                    current_item.setExpanded(True)  # Expand the parent folder
+                    # Create the file in the selected folder
+                    folder_path = os.path.join(self.project_folder, current_item.text(0))
+                    if not os.path.exists(folder_path):
+                        os.makedirs(folder_path)
+                    file_path = os.path.join(folder_path, file_name)
+                    with open(file_path, 'w') as file:
+                        # Initialize the JSON file with an empty list
+                        json.dump([], file)
+                    # Open the file for editing
+                    self.snippet_manager.handle_loaded_json([])
+                    self.snippet_manager.current_file = file_path
+                else:
+                    QMessageBox.warning(self, "Invalid File Name", "File name must end with '.json'.")
+            else:
+                QMessageBox.warning(self, "Invalid Selection", "Please select a folder or the root folder to add a file.")
 
     def remove_selected(self):
         """Remove the selected folder or file."""
@@ -484,20 +504,41 @@ class SnippetManager(QMainWindow):
                 QMessageBox.warning(self, "Error", "Failed to load snippets from the selected file.")
 
     def save_snippets(self):
-        """Open a file dialog to save snippets to a JSON file."""
+        """Save snippets to the currently loaded JSON file."""
         if not self.current_file:
+            # If no file is loaded, prompt the user to save to a new file
             file_name, _ = QFileDialog.getSaveFileName(self, "Save Snippet File", "", "JSON Files (*.json)")
             if file_name:
                 self.current_file = file_name
+            else:
+                QMessageBox.warning(self, "No File Selected", "Please select a file to save the snippets.")
+                return
 
-        if self.current_file:
-            snippets = [{"title": self.snippet_list.item(i).text().split(":")[0].strip(), 
-                        "snippet": self.snippet_list.item(i).text().split(":")[1].strip()} for i in range(self.snippet_list.count())]
+        print(f"Saving to file: {self.current_file}")  # Debug print
+
+        # Prepare the data to save
+        snippets = []
+        for i in range(self.snippet_list.count()):
+            item = self.snippet_list.item(i)
+            title, snippet = item.text().split(":", 1)  # Split into title and snippet
+            snippets.append({"title": title.strip(), "snippet": snippet.strip()})
+
+        print(f"Data to save: {snippets}")  # Debug print
+
+        # Write the data to the file
+        try:
             with open(self.current_file, "w") as file:
-                json.dump(snippets, file, indent=4)
-            self.status_bar.showMessage("Snippets saved successfully.", 2000)
+                json.dump(snippets, file, indent=4)  # Save with pretty formatting
+            print("File saved successfully.")  # Debug print
+            self.status_bar.showMessage(f"Snippets saved to {self.current_file}", 2000)
 
-    # Other methods (add_snippet, edit_snippet, delete_snippet, copy_snippet, etc.) remain unchanged
+            # Verify the file contents after saving
+            with open(self.current_file, "r") as file:
+                saved_data = json.load(file)
+                print(f"File contents after saving: {saved_data}")  # Debug print
+        except Exception as e:
+            print(f"Error saving file: {e}")  # Debug print
+            QMessageBox.warning(self, "Error", f"Failed to save snippets: {str(e)}")
 
     def add_snippet(self):
         """Open dialog to add a new snippet."""
